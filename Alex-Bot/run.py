@@ -108,6 +108,72 @@ def RangerTree(unit):
 print("pystarting")
 
 
+def FindPath(start, goal):
+
+    closed = []
+    open = []
+    startNode = Node(start)
+    nodes = [startNode]
+    open.append(start)
+
+    while len(open) > 0:
+        currentNode = open[0]
+
+    for i in open: #Fixa detta med loc/nodes
+        if i.cost() < currentNode.cost() or (i.cost() == currentNode.cost() and i.gethCost() < currentNode.gethCost()):
+            currentNode = i
+
+    open.remove(currentNode.getLocation())
+    closed.append(currentNode.getLocation())
+
+    if currentNode.getLocation() == goal:
+        return Path(startNode, currentNode)
+    
+    for loc in GetNeighbours(currentNode.getLocation()):
+        if (not gc.can_move(loc)) or closed.count(loc) > 0:
+            continue
+        
+        cost = currentNode.getgCost() + GetDistance(currentNode.getLocation(), loc)
+
+        if open.count(loc) == 0:
+            new = Node(loc)
+            nodes.append(new)
+            currentNode.setChild(new)
+            new.setParent(currentNode)
+            new.setgCost = cost
+            new.sethCost = GetDistance(loc, goal)
+            open.append(loc)
+
+        elif cost < GetNode(loc, nodes).getgCost:
+            node = GetNode(loc, nodes)
+            currentNode.setChild(node)
+            node.setParent(currentNode)
+            node.setgCost = cost
+            node.sethCost = GetDistance(loc, goal)
+
+    
+def GetNeighbours(location):
+    
+    neighbours = [] 
+    for dir in directions:
+        temp = location.add(dir)
+        if gc.can_move(temp):
+            neighbours.append(temp)
+    
+    return neighbours
+            
+def GetDistance(current, goal):
+    return current.distance_squared_to(goal)
+
+def GetNode(location, nodes):
+    for node in nodes:
+        if node.getLocation() == location:
+            return node
+
+def Path (start, goal):
+
+    return start
+
 
 while True:
     # We only support Python 3, which means brackets around print()
@@ -149,5 +215,37 @@ while True:
     sys.stderr.flush()
 
 
+class Node(object):
+    def __init__ (self, location):
+        self.location = location
 
+    def getLocation(self):
+        return self.location
+
+    def setChild(self, child):
+        self.child = child
+
+    def getChild(self):
+        return self.child
+    
+    def setParent(self, parent):
+        self.parent = parent
+    
+    def getParent(self, parent):
+        return self.parent
+
+    def sethCost(self, h):
+        self.h = h
+
+    def gethCost(self):
+        return self.h
+
+    def setgCost(self, g):
+        self.g = g
+
+    def getgCost(self):
+        return self.g
+
+    def cost(self):
+        return g + h
 
