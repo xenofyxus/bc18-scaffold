@@ -55,9 +55,9 @@ def WorkerTree(unit):
 
         units = gc.sense_nearby_units(unit.location.map_location(), unit.vision_range)
         enemies = []
-        for object in units:
-            if object.team != my_team:
-                enemies.append(object)
+        for visibleUnit in units:
+            if visibleUnit.team != my_team:
+                enemies.append(visibleUnit)
 
         if len(enemies) > 0:
             enemy = ClosestUnit(unit.location.map_location(), enemies)
@@ -345,6 +345,17 @@ def FindGreedyPathToLoc(unit, location):
                 return directions[(directionIteration - iter) % length]
             iter = iter + 1
 
+
+def StartingPositions(map):
+    enemyBase = []
+    print("--STARTING POSITIONS--")
+    for unit in map.initial_units:
+        if unit.team is not my_team:
+            enemyBase.append(unit)
+            print("Enemy at: ", unit.location.map_location())
+    print("----------------------")
+    return enemyBase
+
 # ----------------------------- #
 #        MAIN FUNCTION          #
 # ----------------------------- #
@@ -380,6 +391,7 @@ gc.queue_research(bc.UnitType.Mage)
 
 my_team = gc.team()
 map = gc.starting_map(gc.planet())
+
 karbLocations = []
 globEnemy = None
 workerCount = 0
@@ -389,7 +401,7 @@ mageCount = 0
 rangerCount = 0
 if(gc.planet() == bc.Planet.Earth):
     karbLocations = GetCarbs(map)
-
+    enemyBase = StartingPositions(map)
 workerTargetPercent = 0.2
 knightTargetPercent = 0.40
 mageTargetPercent = 0.40
@@ -407,6 +419,8 @@ while True:
 
     # frequent try/catches are a good idea
 
+    #if (gc.round() == (150 or 200 or 250) and gc.planet() == bc.Planet.Earth):
+        #globEnemy = enemyBase[0]
     # First we count our units
     for unit in gc.my_units():
         if unit.unit_type == bc.UnitType.Factory:
