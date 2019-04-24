@@ -382,7 +382,14 @@ def ClosestCarbLocation(position):
         #if(location[1] > 5):
             #print("Enough workers on this karbonite deposit ", location[1])
          #   continue
-        currentDist = position.distance_squared_to(location[0]) 
+        if(len(globEnemies) == 0):
+            enemydist = 0
+        else:
+            enemydist = location[0].distance_squared_to(globEnemies[0].location.map_location())
+        if enemydist > 30:
+            currentDist = position.distance_squared_to(location[0]) 
+        else:
+            currentDist = position.distance_squared_to(location[0]) - enemydist
         if(currentDist < minDist):
             minDist = currentDist
             targetidx = idx
