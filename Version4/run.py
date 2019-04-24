@@ -58,6 +58,9 @@ def WorkerTree(unit):
     global globEnemy
     building = False
     try:
+        if unit.location.is_in_garrison():
+            #print("Ready to load but not loaded")
+            return
         unitTotal = workerCount + knightCount + mageCount + rangerCount
         workerpercentage = workerCount/unitTotal
 
@@ -77,10 +80,10 @@ def WorkerTree(unit):
                 print("replicating")
                 gc.replicate(unit.id, dir)
                 workerCount += 1
-        
+        dir = None
+        closestKarb = None
         if len(karbLocations) > 0:
             closestKarb = unitCarbs.get(unit.id, None)
-            dir = None
             if(closestKarb is None):
                 closestKarb = ClosestCarbLocation(unit.location.map_location())
             elif(gc.can_sense_location(closestKarb[0])):
@@ -108,15 +111,15 @@ def WorkerTree(unit):
                 building = True
             else:
                 dir = FindGreedyPath(unit, targetBuilding.location.map_location())
-
-        if unit.location.map_location().is_adjacent_to(closestKarb[0]):
-            harvestDir = unit.location.map_location().direction_to(closestKarb[0])
-            if(gc.can_harvest(unit.id, harvestDir)):
-                gc.harvest(unit.id, harvestDir)
-                if(gc.karbonite_at(closestKarb[0]) < 1):
-                    karbLocations.remove(closestKarb)
-                    unitCarbs.pop(unit.id)
-                building = True
+        if closestKarb is not None:
+            if unit.location.map_location().is_adjacent_to(closestKarb[0]):
+                harvestDir = unit.location.map_location().direction_to(closestKarb[0])
+                if(gc.can_harvest(unit.id, harvestDir)):
+                    gc.harvest(unit.id, harvestDir)
+                    if(gc.karbonite_at(closestKarb[0]) < 1):
+                        karbLocations.remove(closestKarb)
+                        unitCarbs.pop(unit.id)
+                    building = True
 
         if dir is not None and gc.is_move_ready(unit.id) and gc.can_move(unit.id, dir) and not building:
             Move(unit, dir)
@@ -368,6 +371,7 @@ def ClosestInList(unit, enemylist):
 def ClosestCarbLocation(position):
     global karbLocations
     global unitCarbs
+    global globEnemies
     if(len(karbLocations) == 0):
         #print("No closest location found, locations list is empty. ")
         return None
@@ -375,10 +379,10 @@ def ClosestCarbLocation(position):
     targetidx = None
     #print("Carblocations is ", len(karbLocations), "long")
     for idx, location in enumerate(karbLocations):
-        if(location[1] > 3):
-            print("Enough workers on this karbonite deposit ", location[1])
-            continue
-        currentDist = position.distance_squared_to(location[0])
+        #if(location[1] > 5):
+            #print("Enough workers on this karbonite deposit ", location[1])
+         #   continue
+        currentDist = position.distance_squared_to(location[0]) 
         if(currentDist < minDist):
             minDist = currentDist
             targetidx = idx
