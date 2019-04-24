@@ -9,7 +9,6 @@ def FactoryTree(unit):
     global knightCount
     global mageCount
     global rangerCount
-    global workerCount
     global knightTargetPercent
     global mageTargetPercent
     global rangerTargetPercent
@@ -26,12 +25,7 @@ def FactoryTree(unit):
                     gc.unload(unit.id, dir)
 
                     break
-
-        if (workerCount < 1):
-            if gc.can_produce_robot(unit.id, bc.UnitType.Worker):
-                gc.produce_robot(unit.id, bc.UnitType.Worker)
-
-        elif(knightPercent < knightTargetPercent):
+        if(knightPercent < knightTargetPercent):
             if gc.can_produce_robot(unit.id, bc.UnitType.Knight):
                 gc.produce_robot(unit.id, bc.UnitType.Knight)
         
@@ -48,13 +42,11 @@ def FactoryTree(unit):
         traceback.print_exc()
 
 
-
 def WorkerTree(unit):
     global workerCount
     global factoryCount
     global workerTargetPercent
     global karbLocations
-    global unitCarbs
     global globEnemy
     building = False
     try:
@@ -63,15 +55,15 @@ def WorkerTree(unit):
 
         enemy = ClosestEnemy(unit)
         if enemy is not None:
-            AddToGlobalEnemies(enemy)
+            globEnemy = enemy
 
         if factoryCount < 1:
-            d = FactoryPlacementDirection(unit.location.map_location())
+            d = FindUnoccupiedDirection()
             if d is not None and gc.can_blueprint(unit.id, bc.UnitType.Factory, d):
                 gc.blueprint(unit.id, bc.UnitType.Factory, d)
                 building = True
 
-        if workerpercentage < workerTargetPercent or workerCount < 5:
+        if workerpercentage < workerTargetPercent or workerCount < 3:
             dir = FindUnoccupiedDirection()
             if dir is not None and gc.can_replicate(unit.id, dir):
                 print("replicating")
@@ -79,10 +71,8 @@ def WorkerTree(unit):
                 workerCount += 1
 
         nearbyBuildings = gc.sense_nearby_units_by_type(unit.location.map_location(), 2, bc.UnitType.Factory)
-        closestKarb = unitCarbs.get(unit.id, None)
-        if(closestKarb is None):
-            closestKarb = ClosestCarbLocation(unit.location.map_location())
-        dir = FindGreedyPath(unit, closestKarb[0])
+        closestKarb = ClosestLocation(unit.location.map_location(), karbLocations)
+        dir = FindGreedyPath(unit, closestKarb)
 
         for object in nearbyBuildings:
             # If we find a strucure to build on, we dont want to move.
@@ -91,19 +81,18 @@ def WorkerTree(unit):
                 building = True
                 break
 
-        if unit.location.map_location().is_adjacent_to(closestKarb[0]):
-            harvestDir = unit.location.map_location().direction_to(closestKarb[0])
+        if unit.location.map_location().is_adjacent_to(closestKarb):
+            harvestDir = unit.location.map_location().direction_to(closestKarb)
             if(gc.can_harvest(unit.id, harvestDir)):
                 gc.harvest(unit.id, harvestDir)
-                if(gc.karbonite_at(closestKarb[0]) < 1):
+                if(gc.karbonite_at(closestKarb) < 1):
                     karbLocations.remove(closestKarb)
-                    unitCarbs.pop(unit.id)
                 building = True
 
         if dir is not None and gc.is_move_ready(unit.id) and gc.can_move(unit.id, dir) and not building:
             Move(unit, dir)
              
-        d = FactoryPlacementDirection(unit.location.map_location())
+        d = FindUnoccupiedDirection()
         if d is not None and gc.can_blueprint(unit.id, bc.UnitType.Factory, d):
             gc.blueprint(unit.id, bc.UnitType.Factory, d)
 
@@ -114,7 +103,6 @@ def WorkerTree(unit):
 
 def KnightTree(unit):
     global globEnemy
-    global globEnemies
 
     try:
         if unit.location.is_in_garrison():
@@ -124,9 +112,10 @@ def KnightTree(unit):
         enemy = ClosestEnemy(unit)
 
         if enemy is not None:
-            AddToGlobalEnemies(enemy)
+            globEnemy = enemy
             Attack(unit, enemy)
         
+
         if enemy is not None and not gc.can_attack(unit.id, enemy.id):
             dir = FindGreedyPath(unit, enemy.location.map_location())
             if dir is not None:
@@ -134,9 +123,8 @@ def KnightTree(unit):
                     Move(unit, dir)
                     Attack(unit, enemy)
 
-        elif len(globEnemies) > 0:
-            gEnemy = ClosestGlobalEnemy(unit)
-            dir = FindGreedyPath(unit, gEnemy.location.map_location())
+        elif globEnemy is not None:
+            dir = FindGreedyPath(unit, globEnemy.location.map_location())
             if dir is not None and gc.is_move_ready(unit.id) and gc.can_move(unit.id, dir):
                 Move(unit, dir)
             
@@ -162,7 +150,6 @@ def KnightTree(unit):
 
 def MageTree(unit):
     global globEnemy
-    global globEnemies
     dir = FindUnoccupiedDirection()
     attacked = False
 
@@ -174,16 +161,15 @@ def MageTree(unit):
         enemy = ClosestEnemy(unit)
         if enemy is not None:
             Attack(unit, enemy)
-            AddToGlobalEnemies(enemy)
+            globEnemy = enemy
             attacked = True
             if(gc.is_move_ready(unit.id) and dir is not None):
                 gc.move_robot(unit.id, dir)
                 enemy = ClosestEnemy(unit)
                 Attack(unit, enemy)
 
-        if len(globEnemies) > 0 and not attacked:
-            gEnemy = ClosestGlobalEnemy(unit)
-            dir = FindGreedyPath(unit, gEnemy.location.map_location())
+        if globEnemy is not None and not attacked:
+            dir = FindGreedyPath(unit, globEnemy.location.map_location())
             if dir is not None and gc.is_move_ready(unit.id):
                 Move(unit, dir)
                 enemy = ClosestEnemy(unit)
@@ -200,7 +186,6 @@ def MageTree(unit):
 
 def RangerTree(unit):
     global globEnemy
-    global globEnemies
     attacked = False
 
     try:
@@ -213,7 +198,7 @@ def RangerTree(unit):
         enemy = ClosestEnemy(unit)
         if enemy is not None:
             Attack(unit, enemy)
-            AddToGlobalEnemies(enemy)
+            globEnemy = enemy
             attacked = True
             if(gc.is_move_ready(unit.id) and dir is not None):
                 gc.move_robot(unit.id, dir)
@@ -225,9 +210,8 @@ def RangerTree(unit):
             #print("Sniping")
             #gc.begin_snipe(unit.id, globEnemy.location.map_location())
 
-        if len(globEnemies) > 0 and not attacked:
-            gEnemy = ClosestGlobalEnemy(unit)
-            dir = FindGreedyPath(unit, gEnemy.location.map_location())
+        if globEnemy is not None and not attacked:
+            dir = FindGreedyPath(unit, globEnemy.location.map_location())
             if dir is not None and gc.is_move_ready(unit.id):
                 Move(unit, dir)
                 enemy = ClosestEnemy(unit)
@@ -252,31 +236,6 @@ def RangerTree(unit):
         # use this to show where the error was
         traceback.print_exc()
 
-def FactoryPlacementDirection(currentLoc):
-    dirCanidates = []
-    for d in directions:
-        if gc.can_move(unit.id, d):
-            dirCanidates.append([d, 0])
-
-    for d in dirCanidates:
-        tempLocation = currentLoc.add(d[0])
-        if(map.on_map(tempLocation) is False):
-            continue
-        for newD in directions:
-            tempLocation.add(newD)
-            if(map.on_map(tempLocation) is False):
-                continue
-            if(gc.is_occupiable(tempLocation)):
-                d[1] += 1
-    maxScore = 0
-    finalDir = None
-    for idx, scoredDir in enumerate(dirCanidates):
-        if scoredDir[1] > maxScore:
-            maxScore = scoredDir[1]
-            finalDir = scoredDir[0]
-
-    return finalDir
-
 def FindUnoccupiedDirection():
 
     for d in directions:
@@ -290,7 +249,7 @@ def Attack(unit, enemy):
     if(enemy is not None and gc.can_attack(unit.id, enemy.id) and gc.is_attack_ready(unit.id)):
         gc.attack(unit.id, enemy.id)
 
-    if(gc.can_attack(unit.id, enemy.id) and not gc.is_attack_ready(unit.id) and unit.unit_type != bc.UnitType.Knight and enemy.unit_type != bc.UnitType.Factory and enemy.unit_type != bc.UnitType.Worker):
+    if(gc.can_attack(unit.id, enemy.id) and not gc.is_attack_ready(unit.id) and unit.unit_type != bc.UnitType.Knight):
 
         dir = FleePath(unit, enemy.location.map_location())
         if(gc.is_move_ready(unit.id)):
@@ -308,55 +267,7 @@ def Move(unit, dir):
         print("Want to move again ", dir)
         notMovedUnits.append(unit)
 
-def AddToGlobalEnemies(enemy):
-    global globEnemies
 
-    if globEnemies.count(enemy) == 0:
-        globEnemies.append(enemy)
-    
-    if len(globEnemies) > 2:
-        del globEnemies[0]
-
-def ClosestGlobalEnemy(unit):
-    global globEnemies
-
-    unitLocation = unit.location.map_location()
-    target = None
-    colosestDist = 100000
-
-    for enemy in globEnemies:
-        if enemy is not None:
-            distance = unitLocation.distance_squared_to(enemy.location.map_location())
-            if distance < colosestDist:
-                colosestDist = distance
-                target = enemy
-        else:
-            globEnemies.remove(enemy)
-
-    return target
-
-def ClosestCarbLocation(position):
-    global karbLocations
-    global unitCarbs
-    if(len(karbLocations) == 0):
-        #print("No closest location found, locations list is empty. ")
-        return None
-    minDist = 10000000
-    targetidx = None
-    #print("Carblocations is ", len(karbLocations), "long")
-    for idx, location in enumerate(karbLocations):
-        if(location[1] > 3):
-            print("Enough workers on this karbonite deposit ", location[1])
-            continue
-        currentDist = position.distance_squared_to(location[0])
-        if(currentDist < minDist):
-            minDist = currentDist
-            targetidx = idx
-
-    karbLocations[targetidx][1] += 1
-    unitCarbs[unit.id] = karbLocations[targetidx]
-
-    return karbLocations[targetidx]
 
 # returns the unit in the list units closest to the position specified
 def ClosestEnemy(unit):
@@ -412,13 +323,12 @@ def ClosestLocation(position, locations):
     return target
 
 
-
 def GetCarbs(map):    
     karbLocs = []
     for i in range(map.width):
         for j in range(map.height):
-            location = [bc.MapLocation(bc.Planet.Earth, i, j), 0]
-            if map.initial_karbonite_at(location[0]):
+            location = bc.MapLocation(bc.Planet.Earth, i, j)
+            if map.initial_karbonite_at(location):
                 karbLocs.append(location)
     return karbLocs
 
@@ -477,18 +387,17 @@ def FindGreedyPath(unit, goalLocation):
             if gc.can_sense_location(temp) and gc.is_occupiable(temp) and trail.count(temp) == 0:
                 return directions[(directionIteration - iter) % length]
             iter = iter + 1
-            
-    unitTrails[unit.id] = []
+
 
 def StinkyTrail(trail, location):
     round = gc.round()
     trail.append(location)
-    if round < 300:
+    if round < 250:
         if len(trail) > 4:
             del trail[0]
 
     else:
-        if len(trail) > 8:
+        if len(trail) > 20:
             del trail[0]
     
     return trail
@@ -507,11 +416,14 @@ def StartingPositions(map):
 
 print(os.getcwd())
 
+print("pystarting")
+
 # A GameController is the main type that you talk to the game with.
 # Its constructor will connect to a running game.
 gc = bc.GameController()
 directions = list(bc.Direction)
 
+print("pystarted")
 
 # It's a good idea to try to keep your bots deterministic, 
 # to make debugging easier.
@@ -558,7 +470,7 @@ if mapSize < 500 and startRange < 100:
     knightTargetPercent = 0.85
     mageTargetPercent = 0.0
     rangerTargetPercent = 0.0
-elif(startRange < 250 and mapSize < 1250):
+elif(startRange < 250):
     gc.queue_research(bc.UnitType.Worker)
     gc.queue_research(bc.UnitType.Knight)
     gc.queue_research(bc.UnitType.Knight)
@@ -567,9 +479,9 @@ elif(startRange < 250 and mapSize < 1250):
     gc.queue_research(bc.UnitType.Worker)
     gc.queue_research(bc.UnitType.Worker)
     workerTargetPercent = 0.15
-    knightTargetPercent = 0.5
+    knightTargetPercent = 0.6
     mageTargetPercent = 0.0
-    rangerTargetPercent = 0.35
+    rangerTargetPercent = 0.25
 else:
     gc.queue_research(bc.UnitType.Worker)
     gc.queue_research(bc.UnitType.Ranger)
@@ -580,12 +492,10 @@ else:
     gc.queue_research(bc.UnitType.Ranger)
     knightTargetPercent = 0.0
     mageTargetPercent = 0.0
-    rangerTargetPercent = 0.8
-    workerTargetPercent = 0.2
+    rangerTargetPercent = 0.90
+    workerTargetPercent = 0.1
 
 unitTrails = {}
-globEnemies = []
-unitCarbs = {}
 
 while True:
     # We only support Python 3, which means brackets around print()
@@ -648,12 +558,6 @@ while True:
                 MageTree(unit)
             elif unit.unit_type == bc.UnitType.Ranger:
                 RangerTree(unit)
-                
-        workerCount = 0
-        knightCount = 0
-        factoryCount = 0
-        mageCount = 0
-        rangerCount = 0
 
     except Exception as e:
         print('Error:', e)
